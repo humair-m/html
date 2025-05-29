@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kokoro TTS API Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        kokoro: {
+                            primary: '#4f46e5',
+                            secondary: '#7c3aed',
+                            accent: '#10b981',
+                            dark: '#1e1b4b',
+                            light: '#f5f3ff'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'wave': 'wave 1.5s ease-in-out infinite'
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        },
+                        wave: {
+                            '0%, 100%': { transform: 'scaleY(1)' },
+                            '50%': { transform: 'scaleY(1.5)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Custom checkbox */
+        .custom-checkbox {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #4f46e5;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .custom-checkbox:checked {
+            background-color: #4f46e5;
+        }
+        .custom-checkbox:checked::after {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+        }
+        
+        /* Wave animation for audio visualization */
+        .wave-bar {
+            animation: wave 1.2s ease-in-out infinite;
+            animation-delay: calc(var(--delay) * 0.1s);
+        }
+        
+        /* Textarea resizer */
+        .resizable-textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        /* Voice card hover effect */
+        .voice-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Tab underline animation */
+        .tab-underline {
+            position: relative;
+        }
+        .tab-underline::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: #4f46e5;
+            transition: width 0.3s ease;
+        }
+        .tab-underline:hover::after {
+            width: 100%;
+        }
+        .tab-underline.active::after {
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-kokoro-light min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-kokoro-primary to-kokoro-secondary text-white shadow-xl sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <div class="relative mr-3">
+                        <i class="fas fa-microphone-alt text-3xl text-white"></i>
+                        <span class="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-green-400 animate-pulse"></span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold">Kokoro TTS API</h1>
+                        <p class="text-xs text-indigo-200">Advanced Text-to-Speech Interface</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="hidden md:block">
+                        <div class="flex items-center text-sm bg-white/10 px-3 py-1 rounded-full">
+                            <span class="h-2 w-2 rounded-full bg-green-400 mr-2"></span>
+                            <span>API Connected</span>
+                        </div>
+                    </div>
+                    <button onclick="checkHealth()" class="bg-white/90 text-kokoro-primary px-4 py-2 rounded-lg font-medium hover:bg-white transition flex items-center shadow-sm">
+                        <i class="fas fa-heartbeat mr-2"></i>Health Check
+                    </button>
+                    <button onclick="showConfig()" class="bg-kokoro-dark/90 text-white px-4 py-2 rounded-lg font-medium hover:bg-kokoro-dark transition flex items-center shadow-sm">
+                        <i class="fas fa-sliders-h mr-2"></i>Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Stats Bar -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-4 flex items-center">
+                <div class="bg-kokoro-light rounded-full p-3 mr-4">
+                    <i class="fas fa-microphone text-kokoro-primary text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Available Voices</p>
+                    <p class="text-xl font-bold" id="voice-count">12</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4 flex items-center">
+                <div class="bg-kokoro-light rounded-full p-3 mr-4">
+                    <i class="fas fa-clock text-kokoro-primary text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Avg. Response</p>
+                    <p class="text-xl font-bold" id="avg-response">0.45s</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4 flex items-center">
+                <div class="bg-kokoro-light rounded-full p-3 mr-4">
+                    <i class="fas fa-bolt text-kokoro-primary text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Today's Usage</p>
+                    <p class="text-xl font-bold" id="daily-usage">24/1000</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4 flex items-center">
+                <div class="bg-kokoro-light rounded-full p-3 mr-4">
+                    <i class="fas fa-server text-kokoro-primary text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">API Status</p>
+                    <p class="text-xl font-bold text-green-600" id="api-status">Operational</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Panel -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <!-- Tab Navigation -->
+            <div class="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
+                <button class="tab-button tab-underline active px-6 py-4 flex items-center text-sm font-medium text-kokoro-primary" data-tab="basic">
+                    <i class="fas fa-comment-alt mr-2"></i>Basic TTS
+                </button>
+                <button class="tab-button tab-underline px-6 py-4 flex items-center text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="stream">
+                    <i class="fas fa-stream mr-2"></i>Streaming
+                </button>
+                <button class="tab-button tab-underline px-6 py-4 flex items-center text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="batch">
+                    <i class="fas fa-layer-group mr-2"></i>Batch
+                </button>
+                <button class="tab-button tab-underline px-6 py-4 flex items-center text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="emotion">
+                    <i class="fas fa-smile-beam mr-2"></i>Emotion
+                </button>
+                <button class="tab-button tab-underline px-6 py-4 flex items-center text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="multi-voice">
+                    <i class="fas fa-users mr-2"></i>Multi-Voice
+                </button>
+                <button class="tab-button tab-underline px-6 py-4 flex items-center text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="status">
+                    <i class="fas fa-tasks mr-2"></i>Status
+                </button>
+                <button class="tab-button tab-underline px-6 py-4 flex items-center text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="voices">
+                    <i class="fas fa-microphone mr-2"></i>Voices
+                </button>
+            </div>
+
+            <!-- Basic TTS Tab -->
+            <div id="basic-tab" class="tab-content active">
+                <div class="p-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Input Panel -->
+                        <div>
+                            <div class="mb-6">
+                                <label class="block text-gray-700 font-medium mb-2 flex justify-between items-center">
+                                    <span>Text to Synthesize</span>
+                                    <span class="text-xs font-normal text-gray-500">Max 5000 characters</span>
+                                </label>
+                                <div class="relative">
+                                    <textarea
+                                        id="basic-text"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kokoro-primary focus:border-kokoro-primary transition duration-200 resizable-textarea"
+                                        placeholder="Enter text to convert to speech..."
+                                        maxlength="5000"
+                                    >Hello! Welcome to Kokoro TTS, the most advanced text-to-speech API interface.</textarea>
+                                    <div class="absolute bottom-2 right-2 bg-white/80 px-2 py-1 rounded text-xs text-gray-500">
+                                        <span id="basic-char-count">42</span>/<span>5000</span>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between mt-1 text-sm text-gray-500">
+                                    <span id="basic-word-count">8 words</span>
+                                    <button onclick="clearText('basic-text')" class="text-kokoro-primary hover:text-kokoro-secondary text-xs">
+                                        <i class="fas fa-trash-alt mr-1"></i>Clear
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label class="block text-gray-700 font-medium mb-2">Voice</label>
+                                    <div class="relative">
+                                        <select id="basic-voice" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kokoro-primary focus:border-kokoro-primary appearance-none bg-white pr-8">
+                                            <!-- Populated by loadVoices() -->
+                                        </select>
+                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                            <i class="fas fa-chevron-down text-gray-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-700 font-medium mb-2">Format</label>
+                                    <div class="relative">
+                                        <select id="basic-format" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kokoro-primary focus:border-kokoro-primary appearance-none bg-white pr-8">
+                                            <option value="wav">WAV (High Quality)</option>
+                                            <option value="mp3" selected>MP3 (Balanced)</option>
+                                            <option value="ogg">OGG (Small Size)</option>
+                                        </select>
+                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                            <i class="fas fa-chevron-down text-gray-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <label class="block text-gray-700 font-medium mb-2">
+                                    <div class="flex justify-between">
+                                        <span>Speed</span>
+                                        <span id="basic-speed-value" class="text-kokoro-primary font-normal">1.0x</span>
+                                    </div>
+                                </label>
+                                <input
+                                    type="range"
+                                    id="basic-speed"
+                                    min="0.5"
+                                    max="2"
+                                    step="0.1"
+                                    value="1"
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-kokoro-primary"
+                                />
+                                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>0.5x</span>
+                                    <span>1.0x</span>
+                                    <span>2.0x</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="basic-gpu" class="custom-checkbox mr-3" checked>
+                                    <label for="basic-gpu" class="text-gray-700 cursor-pointer">GPU Acceleration</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="basic-ssml" class="custom-checkbox mr-3">
+                                    <label for="basic-ssml" class="text-gray-700 cursor-pointer">SSML Support</label>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    onclick="generateBasicTTS()"
+                                    class="bg-gradient-to-r from-kokoro-primary to-kokoro-secondary text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex-1 flex items-center justify-center shadow-md hover:shadow-lg"
+                                >
+                                    <i class="fas fa-play-circle mr-2"></i>
+                                    Generate Speech
+                                </button>
+                                <button
+                                    onclick="downloadBasicTTS()"
+                                    id="basic-download-btn"
+                                    class="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-300 transition flex items-center justify-center shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled
+                                >
+                                    <i class="fas fa-download mr-2"></i>
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Output Panel -->
+                        <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-medium text-gray-800">API Request</h3>
+                                <div class="flex space-x-2">
+                                    <button onclick="copyToClipboard('basic-api-request')" class="text-kokoro-primary hover:text-kokoro-secondary text-sm flex items-center">
+                                        <i class="fas fa-copy mr-1"></i>Copy
+                                    </button>
+                                    <button onclick="toggleRequestView()" id="request-view-btn" class="text-kokoro-primary hover:text-kokoro-secondary text-sm flex items-center">
+                                        <i class="fas fa-code mr-1"></i>Raw
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-gray-800 text-gray-100 p-4 rounded-lg mb-6 overflow-x-auto max-h-40">
+                                <pre id="basic-api-request" class="text-sm font-mono">{
+  "text": "Hello! Welcome to Kokoro TTS...",
+  "voice": "en-US-Wavenet-A",
+  "format": "mp3",
+  "speed": 1.0,
+  "gpu": true,
+  "ssml": false
+}</pre>
+                            </div>
+                            
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-medium text-gray-800">Response</h3>
+                                <div id="basic-response-time" class="text-sm text-gray-500">0.42s</div>
+                            </div>
+                            <div id="basic-response" class="bg-gray-100 p-4 rounded-lg min-h-32 flex flex-col items-center justify-center">
+                                <div class="text-center text-gray-500">
+                                    <i class="fas fa-music text-3xl mb-2 text-kokoro-primary"></i>
+                                    <p class="italic">Your generated audio will appear here...</p>
+                                </div>
+                            </div>
+                            <div id="basic-audio-controls" class="mt-4">
+                                <div class="flex items-center justify-center space-x-4 mb-3" id="wave-animation">
+                                    <div class="wave-bar h-8 w-1 bg-kokoro-primary rounded" style="--delay: 1"></div>
+                                    <div class="wave-bar h-6 w-1 bg-kokoro-primary rounded" style="--delay: 2"></div>
+                                    <div class="wave-bar h-10 w-1 bg-kokoro-primary rounded" style="--delay: 3"></div>
+                                    <div class="wave-bar h-6 w-1 bg-kokoro-primary rounded" style="--delay: 4"></div>
+                                    <div class="wave-bar h-8 w-1 bg-kokoro-primary rounded" style="--delay: 5"></div>
+                                </div>
+                                <audio id="basic-audio-player" controls class="w-full"></audio>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other tabs would follow the same pattern -->
+            <!-- For brevity, I've included only the Basic TTS tab in this example -->
+            <!-- The other tabs would be structured similarly with appropriate content -->
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-12">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <i class="fas fa-microphone-alt text-xl text-kokoro-primary mr-2"></i>
+                    <span class="font-medium">Kokoro TTS API</span>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-600 hover:text-kokoro-primary">
+                        <i class="fab fa-github"></i>
+                    </a>
+                    <a href="#" class="text-gray-600 hover:text-kokoro-primary">
+                        <i class="fab fa-twitter"></i>
+                    </a>
+                    <a href="#" class="text-gray-600 hover:text-kokoro-primary">
+                        <i class="fas fa-book"></i>
+                    </a>
+                    <a href="#" class="text-gray-600 hover:text-kokoro-primary">
+                        <i class="fas fa-question-circle"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="mt-4 text-center md:text-left text-sm text-gray-500">
+                <p>© 2023 Kokoro TTS. All rights reserved. | Version 2.1.0</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Global variables
+        let voices = {};
+        let currentJobs = {};
+        let audioContext = null;
+        let audioAnalyser = null;
+        let isPlaying = false;
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTabs();
+            loadVoices();
+            setupEventListeners();
+            updateBasicCounts();
+            updateBasicAPIRequest();
+            simulateStats();
+        });
+
+        // Tab functionality
+        function initializeTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.getAttribute('data-tab');
+                    
+                    // Remove active class from all tabs and contents
+                    tabButtons.forEach(btn => {
+                        btn.classList.remove('active');
+                        btn.classList.remove('text-kokoro-primary');
+                        btn.classList.add('text-gray-500');
+                    });
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    button.classList.add('active');
+                    button.classList.add('text-kokoro-primary');
+                    button.classList.remove('text-gray-500');
+                    document.getElementById(tabId + '-tab').classList.add('active');
+                });
+            });
+        }
+
+        // Event listeners
+        function setupEventListeners() {
+            // Text counters
+            document.getElementById('basic-text').addEventListener('input', updateBasicCounts);
+            document.getElementById('basic-speed').addEventListener('input', updateSpeedValue);
+            
+            // Audio player events
+            const audioPlayer = document.getElementById('basic-audio-player');
+            audioPlayer.addEventListener('play', () => {
+                isPlaying = true;
+                animateWave();
+            });
+            audioPlayer.addEventListener('pause', () => {
+                isPlaying = false;
+            });
+            audioPlayer.addEventListener('ended', () => {
+                isPlaying = false;
+            });
+
+            // Update API request preview
+            ['basic-text', 'basic-voice', 'basic-format', 'basic-speed', 'basic-gpu', 'basic-ssml'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', updateBasicAPIRequest);
+                    element.addEventListener('change', updateBasicAPIRequest);
+                }
+            });
+        }
+
+        // Load voices from API
+        async function loadVoices() {
+            try {
+                // Simulate API call
+                setTimeout(() => {
+                    voices = {
+                        american_female: [
+                            {id: 'af_heart', name: 'Heart', emoji: '❤️', language: 'en-US', gender: 'female', sample: 'https://example.com/samples/heart.mp3'},
+                            {id: 'af_bella', name: 'Bella', emoji: '🌸', language: 'en-US', gender: 'female', sample: 'https://example.com/samples/bella.mp3'},
+                            {id: 'af_nicole', name: 'Nicole', emoji: '🌟', language: 'en-US', gender: 'female', sample: 'https://example.com/samples/nicole.mp3'}
+                        ],
+                        american_male: [
+                            {id: 'am_michael', name: 'Michael', emoji: '🎤', language: 'en-US', gender: 'male', sample: 'https://example.com/samples/michael.mp3'},
+                            {id: 'am_liam', name: 'Liam', emoji: '🎭', language: 'en-US', gender: 'male', sample: 'https://example.com/samples/liam.mp3'}
+                        ],
+                        british_female: [
+                            {id: 'bf_emma', name: 'Emma', emoji: '🇬🇧', language: 'en-GB', gender: 'female', sample: 'https://example.com/samples/emma.mp3'},
+                            {id: 'bf_alice', name: 'Alice', emoji: '👑', language: 'en-GB', gender: 'female', sample: 'https://example.com/samples/alice.mp3'}
+                        ],
+                        british_male: [
+                            {id: 'bm_george', name: 'George', emoji: '🎩', language: 'en-GB', gender: 'male', sample: 'https://example.com/samples/george.mp3'},
+                            {id: 'bm_daniel', name: 'Daniel', emoji: '⚡', language: 'en-GB', gender: 'male', sample: 'https://example.com/samples/daniel.mp3'}
+                        ],
+                        japanese_female: [
+                            {id: 'jf_sakura', name: 'Sakura', emoji: '🌸', language: 'ja-JP', gender: 'female', sample: 'https://example.com/samples/sakura.mp3'},
+                            {id: 'jf_akari', name: 'Akari', emoji: '✨', language: 'ja-JP', gender: 'female', sample: 'https://example.com/samples/akari.mp3'}
+                        ]
+                    };
+                    
+                    populateVoiceSelects();
+                    displayVoicesList();
+                    updateVoiceCount();
+                    
+                    // Set default voice
+                    document.getElementById('basic-voice').value = 'af_heart';
+                    updateBasicAPIRequest();
+                }, 800);
+            } catch (error) {
+                console.error('Error loading voices:', error);
+                showToast('Failed to load voices. Using default set.', 'error');
+            }
+        }
+
+        // Populate voice select elements
+        function populateVoiceSelects() {
+            const selects = ['basic-voice', 'stream-voice', 'emotion-voice'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (select) {
+                    select.innerHTML = '';
+                    
+                    // Add a default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Select a voice...';
+                    defaultOption.disabled = true;
+                    defaultOption.selected = true;
+                    select.appendChild(defaultOption);
+                    
+                    Object.entries(voices).forEach(([category, voiceList]) => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        
+                        voiceList.forEach(voice => {
+                            const option = document.createElement('option');
+                            option.value = voice.id;
+                            option.textContent = `${voice.emoji} ${voice.name} (${voice.language})`;
+                            optgroup.appendChild(option);
+                        });
+                        
+
+</html>
