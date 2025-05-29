@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kokoro TTS Web App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        kokoro: {
+                            100: '#f0e6ff',
+                            200: '#d9c7ff',
+                            300: '#b99aff',
+                            400: '#9a6dff',
+                            500: '#7d40ff',
+                            600: '#6b1aff',
+                            700: '#5a00f0',
+                            800: '#4a00c7',
+                            900: '#3a009e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+        }
+        .voice-pill {
+            transition: all 0.2s ease;
+        }
+        .voice-pill:hover {
+            transform: scale(1.05);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .sidebar {
+            height: calc(100vh - 4rem);
+            position: sticky;
+            top: 4rem;
+            overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                height: auto;
+                position: relative;
+                top: 0;
+            }
+        }
+        .waveform {
+            height: 60px;
+            background: linear-gradient(90deg, #6e8efb, #a777e3, #6e8efb);
+            background-size: 200% 100%;
+            animation: wave 1.5s linear infinite;
+            border-radius: 4px;
+        }
+        @keyframes wave {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .audio-wave {
+            display: flex;
+            align-items: flex-end;
+            height: 60px;
+            width: 100%;
+            gap: 2px;
+        }
+        .audio-wave-bar {
+            background-color: #7d40ff;
+            width: 4px;
+            border-radius: 2px;
+            animation: waveBar 1.2s ease-in-out infinite;
+        }
+        @keyframes waveBar {
+            0%, 100% { height: 20%; }
+            50% { height: 80%; }
+        }
+        .audio-wave-bar:nth-child(2) { animation-delay: 0.1s; }
+        .audio-wave-bar:nth-child(3) { animation-delay: 0.2s; }
+        .audio-wave-bar:nth-child(4) { animation-delay: 0.3s; }
+        .audio-wave-bar:nth-child(5) { animation-delay: 0.4s; }
+        .audio-wave-bar:nth-child(6) { animation-delay: 0.5s; }
+        .audio-wave-bar:nth-child(7) { animation-delay: 0.6s; }
+        .audio-wave-bar:nth-child(8) { animation-delay: 0.7s; }
+        .audio-wave-bar:nth-child(9) { animation-delay: 0.8s; }
+        .audio-wave-bar:nth-child(10) { animation-delay: 0.9s; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <i class="fas fa-robot text-3xl mr-3"></i>
+                    <h1 class="text-3xl font-bold">Kokoro TTS Web App</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="bg-white text-purple-700 px-3 py-1 rounded-full text-sm font-semibold">v1.0.0</span>
+                    <button class="bg-white text-purple-700 px-4 py-2 rounded-lg font-medium hover:bg-purple-100 transition">
+                        <i class="fas fa-bolt mr-2"></i>API Docs
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8 flex flex-col md:flex-row">
+        <!-- Sidebar Navigation -->
+        <div class="w-full md:w-1/4 lg:w-1/5 pr-0 md:pr-8 mb-8 md:mb-0 sidebar">
+            <div class="bg-white rounded-lg shadow-md p-4 sticky top-4">
+                <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Navigation</h2>
+                <ul class="space-y-2">
+                    <li><button onclick="showTab('tts')" class="w-full text-left flex items-center text-kokoro-700 hover:text-kokoro-900 font-medium"><i class="fas fa-microphone-alt mr-2"></i>Text to Speech</button></li>
+                    <li><button onclick="showTab('batch')" class="w-full text-left flex items-center text-gray-700 hover:text-kokoro-700"><i class="fas fa-layer-group mr-2"></i>Batch Processing</button></li>
+                    <li><button onclick="showTab('voices')" class="w-full text-left flex items-center text-gray-700 hover:text-kokoro-700"><i class="fas fa-users mr-2"></i>Voice Gallery</button></li>
+                    <li><button onclick="showTab('monitor')" class="w-full text-left flex items-center text-gray-700 hover:text-kokoro-700"><i class="fas fa-chart-line mr-2"></i>API Monitoring</button></li>
+                    <li><button onclick="showTab('settings')" class="w-full text-left flex items-center text-gray-700 hover:text-kokoro-700"><i class="fas fa-cog mr-2"></i>Settings</button></li>
+                </ul>
+                
+                <div class="mt-8">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">API Status</h2>
+                    <div id="api-status" class="flex items-center">
+                        <div class="w-3 h-3 bg-green-500 rounded-full mr-2 pulse"></div>
+                        <span class="text-green-700 font-medium">Checking...</span>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-600">
+                        <p>Last checked: <span id="last-checked">-</span></p>
+                        <p>Response time: <span id="response-time">-</span></p>
+                    </div>
+                </div>
+                
+                <div class="mt-6 bg-kokoro-50 border border-kokoro-200 rounded-lg p-3">
+                    <h3 class="font-bold text-kokoro-800 mb-1">API Base URL</h3>
+                    <input id="api-base-url" class="text-sm break-words w-full bg-transparent border-none" value="http://localhost:8000">
+                    <button onclick="updateApiUrl()" class="mt-2 text-xs text-kokoro-600 hover:text-kokoro-800">Apply Change</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="w-full md:w-3/4 lg:w-4/5">
+            <!-- Text to Speech Tab -->
+            <div id="tts" class="tab-content active">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Text to Speech</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Input Section -->
+                        <div class="lg:col-span-2">
+                            <div class="mb-4">
+                                <label class="block text-gray-700 font-medium mb-2">Enter Text</label>
+                                <textarea id="tts-text" class="w-full h-40 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500" placeholder="Type or paste text here...">Welcome to Kokoro TTS, the most advanced text-to-speech API. This is a sample text to demonstrate the capabilities of our service.</textarea>
+                                <div class="flex justify-between mt-1 text-sm text-gray-500">
+                                    <span>Max 5000 characters</span>
+                                    <span id="char-count">0/5000</span>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-gray-700 font-medium mb-2">Voice</label>
+                                    <select id="voice-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                        <option value="">Loading voices...</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-700 font-medium mb-2">Speed</label>
+                                    <div class="flex items-center">
+                                        <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full mr-3">
+                                        <span id="speed-value" class="text-kokoro-700 font-medium">1.0x</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div>
+                                    <label class="block text-gray-700 font-medium mb-2">Audio Format</label>
+                                    <div class="flex space-x-4">
+                                        <label class="inline-flex items-center">
+                                            <input type="radio" name="format" value="wav" checked class="text-kokoro-600 focus:ring-kokoro-500">
+                                            <span class="ml-2">WAV</span>
+                                        </label>
+                                        <label class="inline-flex items-center">
+                                            <input type="radio" name="format" value="mp3" class="text-kokoro-600 focus:ring-kokoro-500">
+                                            <span class="ml-2">MP3</span>
+                                        </label>
+                                        <label class="inline-flex items-center">
+                                            <input type="radio" name="format" value="ogg" class="text-kokoro-600 focus:ring-kokoro-500">
+                                            <span class="ml-2">OGG</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-700 font-medium mb-2">Emotion</label>
+                                    <select id="emotion-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                        <option value="neutral">Neutral</option>
+                                        <option value="happy">Happy</option>
+                                        <option value="sad">Sad</option>
+                                        <option value="angry">Angry</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <button id="generate-btn" class="w-full bg-kokoro-600 hover:bg-kokoro-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center">
+                                    <i class="fas fa-bolt mr-2"></i>Generate Speech
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Preview Section -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-lg font-bold mb-3 text-gray-800">Audio Preview</h3>
+                            
+                            <div id="audio-preview" class="mb-4">
+                                <div id="waveform" class="mb-3">
+                                    <div id="audio-wave" class="audio-wave hidden">
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                        <div class="audio-wave-bar"></div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-center">
+                                    <button id="play-btn" class="bg-kokoro-500 hover:bg-kokoro-600 text-white rounded-full w-12 h-12 flex items-center justify-center">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                    <audio id="audio-player" class="hidden"></audio>
+                                </div>
+                                <p id="preview-text" class="text-center text-gray-500 mt-3">Generate speech to preview</p>
+                                <div class="mt-3" id="download-section" style="display: none;">
+                                    <button id="download-btn" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-md flex items-center justify-center">
+                                        <i class="fas fa-download mr-2"></i>Download Audio
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h3 class="text-lg font-bold mb-3 text-gray-800">Recent Files</h3>
+                                <div class="space-y-2" id="recent-files">
+                                    <!-- Generated files will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Batch Processing Tab -->
+            <div id="batch" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Batch Processing</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                            <div class="mb-4">
+                                <label class="block text-gray-700 font-medium mb-2">Upload CSV File</label>
+                                <div class="flex items-center justify-center w-full">
+                                    <label id="drop-zone" class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                            <i id="csv-icon" class="fas fa-file-csv text-4xl text-gray-400 mb-3"></i>
+                                            <p id="drop-text" class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                                            <p class="text-xs text-gray-500">CSV format: text,voice,speed,emotion</p>
+                                        </div>
+                                        <input id="batch-file" type="file" class="hidden" accept=".csv">
+                                    </label>
+                                </div>
+                                <div id="file-details" class="mt-2 hidden">
+                                    <h3 class="font-medium">Selected File:</h3>
+                                    <p id="file-name" class="text-sm truncate"></p>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <button id="process-btn" class="w-full bg-kokoro-600 hover:bg-kokoro-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center">
+                                    <i class="fas fa-bolt mr-2"></i>Process Batch
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-bold mb-3 text-gray-800">Batch Processing Status</h3>
+                            <div id="batch-status" class="bg-gray-50 rounded-lg p-4">
+                                <div class="mb-4">
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-sm font-medium text-gray-700">Status: <span id="batch-state">Ready</span></span>
+                                        <span class="text-sm font-medium text-gray-700"><span id="progress-percent">0</span>%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                        <div id="progress-bar" class="bg-kokoro-600 h-2.5 rounded-full" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div id="file-progress" class="space-y-3">
+                                    <p class="text-center text-gray-500">No batch processing started yet</p>
+                                </div>
+                                
+                                <div id="batch-actions" class="mt-4 flex justify-between hidden">
+                                    <button id="pause-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                        <i class="fas fa-pause mr-1"></i> Pause
+                                    </button>
+                                    <button id="cancel-btn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+                                        <i class="fas fa-times mr-1"></i> Cancel
+                                    </button>
+                                    <button id="download-batch-btn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 hidden">
+                                        <i class="fas fa-download mr-1"></i> Download All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Voice Gallery Tab -->
+            <div id="voices" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Voice Gallery</h2>
+                    
+                    <div class="mb-6">
+                        <div class="flex items-center mb-4">
+                            <input type="text" id="voice-search" placeholder="Search voices..." class="flex-grow px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                            <button id="search-btn" class="bg-kokoro-600 text-white px-4 py-2 rounded-r-md hover:bg-kokoro-700">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-2 mb-4" id="voice-filters">
+                            <button data-filter="all" class="px-3 py-1 bg-kokoro-100 text-kokoro-800 rounded-full text-sm font-medium">All</button>
+                            <button data-filter="american" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium hover:bg-gray-200">American</button>
+                            <button data-filter="british" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium hover:bg-gray-200">British</button>
+                            <button data-filter="female" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium hover:bg-gray-200">Female</button>
+                            <button data-filter="male" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium hover:bg-gray-200">Male</button>
+                            <button data-filter="emotional" class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium hover:bg-gray-200">Emotional</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="voices-container">
+                        <!-- Voices will be dynamically loaded here -->
+                        <div class="text-center py-12">
+                            <i class="fas fa-spinner fa-spin text-4xl text-kokoro-600"></i>
+                            <p class="mt-4 text-gray-600">Loading voices...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Create Custom Voice</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 font-medium mb-2">Voice Name</label>
+                                    <input id="custom-voice-name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500" placeholder="e.g., custom_voice_01">
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 font-medium mb-2">Upload Voice Samples</label>
+                                    <div class="flex items-center justify-center w-full">
+                                        <label id="voice-samples-drop" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <i id="audio-icon" class="fas fa-file-audio text-2xl text-gray-400 mb-2"></i>
+                                                <p id="samples-text" class="text-sm text-gray-500"><span class="font-semibold">Click to upload</span> audio files</p>
+                                            </div>
+                                            <input id="voice-samples" type="file" class="hidden" accept="audio/*" multiple>
+                                        </label>
+                                    </div>
+                                    <div id="samples-list" class="mt-2 hidden">
+                                        <h3 class="font-medium text-sm">Selected Files:</h3>
+                                        <ul id="samples-names" class="text-xs text-gray-600"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <div class="mb-4">
+                                    <label class="block text-gray-700 font-medium mb-2">Voice Characteristics</label>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="text-sm text-gray-600">Gender</label>
+                                            <div class="flex space-x-4 mt-1">
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="gender" value="male" class="text-kokoro-600 focus:ring-kokoro-500">
+                                                    <span class="ml-2">Male</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="gender" value="female" checked class="text-kokoro-600 focus:ring-kokoro-500">
+                                                    <span class="ml-2">Female</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="text-sm text-gray-600">Accent</label>
+                                            <select id="custom-accent" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                                <option value="american">American</option>
+                                                <option value="british">British</option>
+                                                <option value="australian">Australian</option>
+                                                <option value="custom">Custom</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="text-sm text-gray-600">Pitch</label>
+                                            <input id="custom-pitch" type="range" min="0" max="100" value="50" class="w-full mt-1">
+                                            <div class="flex justify-between text-xs text-gray-500">
+                                                <span>Low</span>
+                                                <span>Medium</span>
+                                                <span>High</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button id="train-voice-btn" class="w-full bg-kokoro-600 hover:bg-kokoro-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                                    Train Custom Voice
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Settings</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2">
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold mb-4 text-gray-800">API Configuration</h3>
+                                
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-gray-700 font-medium mb-2">API Base URL</label>
+                                        <input id="settings-api-url" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-gray-700 font-medium mb-2">API Key</label>
+                                        <div class="flex">
+                                            <input id="api-key" type="password" value="sk_1234567890abcdef" class="flex-grow px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                            <button id="toggle-key" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-r-md hover:bg-gray-300">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1">Regenerate key every 90 days for security</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-gray-700 font-medium mb-2">Default Settings</label>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm text-gray-600 mb-1">Default Voice</label>
+                                                <select id="default-voice" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                                    <option value="">Loading voices...</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm text-gray-600 mb-1">Default Format</label>
+                                                <select id="default-format" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-kokoro-500">
+                                                    <option value="wav" selected>WAV</option>
+                                                    <option value="mp3">MP3</option>
+                                                    <option value="ogg">OGG</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                                <h3 class="text-lg font-bold mb-3 text-gray-800">API Usage</h3>
+                                <div class="mb-4 relative w-24 h-24 mx-auto">
+                                    <svg class="w-full h-full" viewBox="0 0 42 42">
+                                        <circle class="stroke-current text-gray-200" stroke-width="4" fill="none" cx="21" cy="21" r="15.91549430918954" />
+                                        <circle id="usage-ring" class="progress-ring__circle stroke-current text-kokoro-600" stroke-width="4" stroke-dasharray="100, 100" stroke-linecap="round" fill="none" transform="rotate(-90 21 21)" cx="21" cy="21" r="15.91549430918954" />
+                                        <text x="21" y="23" text-anchor="middle" class="text-xl font-bold">24%</text>
+                                    </svg>
+                                </div>
+                                <p class="text-sm text-center text-gray-600 mt-2">1,200 / 5,000 requests used</p>
+                                <p class="text-sm text-center text-gray-600">Reset on: October 1, 2023</p>
+                                <button class="w-full mt-4 bg-kokoro-600 hover:bg-kokoro-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                                    Upgrade Plan
+                                </button>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h3 class="text-lg font-bold mb-3 text-gray-800">Danger Zone</h3>
+                                <div class="space-y-3">
+                                    <button id="clear-cache" class="w-full text-left bg-white border border-yellow-500 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-50 flex items-center">
+                                        <i class="fas fa-sync-alt mr-2"></i> Clear API Cache
+                                    </button>
+                                    <button id="delete-files" class="w-full text-left bg-white border border-red-500 text-red-700 px-4 py-2 rounded hover:bg-red-50 flex items-center">
+                                        <i class="fas fa-trash mr-2"></i> Delete All Generated Files
+                                    </button>
+                                    <button id="stop-api" class="w-full text-left bg-white border border-red-700 text-red-900 px-4 py-2 rounded hover:bg-red-50 flex items-center">
+                                        <i class="fas fa-power-off mr-2"></i> Stop API Service
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end">
+                        <button id="cancel-settings" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 mr-3">
+                            Cancel
+                        </button>
+                        <button id="save-settings" class="px-4 py-2 bg-kokoro-600 text-white rounded hover:bg-kokoro-700">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center">
+                        <i class="fas fa-robot text-2xl mr-3"></i>
+                        <h2 class="text-xl font-bold">Kokoro TTS API</h2>
+                    </div>
+                    <p class="text-gray-400 mt-2">High-quality text-to-speech synthesis</p>
+                </div>
+                
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fab fa-github text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fab fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fab fa-discord text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-book text-xl"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400 text-sm">
+                <p>© 2023 Kokoro TTS API. All rights reserved. Version 1.0.0</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // API base URL from settings
+        let API_BASE_URL = 'http://localhost:8000';
+        let voices = [];
+        let recentFiles = [];
+        let batchFiles = [];
+        let batchProcessing = false;
+        let batchInterval = null;
+        let batchFilesCompleted = 0;
+        let batchFilesTotal = 0;
+        
+        // Tab navigation
+        function showTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+        }
+        
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load API URL from input
+            const apiUrlInput = document.getElementById('api-base-url');
+            API_BASE_URL = apiUrlInput.value;
+            
+            // Initialize settings API URL
+            document.getElementById('settings-api-url').value = API_BASE_URL;
+            
+            // Event listeners
+            setupEventListeners();
+            
+            // Initialize UI components
+            initUiComponents();
+            
+            // Load voices from API
+            loadVoices();
+            
+            // Check API status
+            checkApiStatus();
+            
+            // Load recent files from localStorage
+            loadRecentFiles();
+        });
+        
+        function setupEventListeners() {
+            // Speed slider
+            const speedSlider = document.getElementById('speed-slider');
+            const speedValue = document.getElementById('speed-value');
+            
+            if (speedSlider && speedValue) {
+                speedSlider.addEventListener('input', function() {
+                    speedValue.textContent = this.value + 'x';
+                });
+            }
+            
+            // Character counter
+            const textInput = document.getElementById('tts-text');
+            const charCount = document.getElementById('char-count');
+            
+            if (textInput && charCount) {
+                textInput.addEventListener('input', function() {
+                    const count = this.value.length;
+                    charCount.textContent = count + '/5000';
+                    
+                    if (count > 5000) {
+                        charCount.classList.add('text-red-600');
+                    } else {
+                        charCount.classList.remove('text-red-600');
+                    }
+                });
+                
+                // Initialize count
+                charCount.textContent = textInput.value.length + '/5000';
+            }
+            
+            // Generate button
+            const generateBtn = document.getElementById('generate-btn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', generateTTS);
+            }
+            
+            // Play button
+            const playBtn = document.getElementById('play-btn');
+            const audioPlayer = document.getElementById('audio-player');
+            if (playBtn && audioPlayer) {
+                playBtn.addEventListener('click', function() {
+                    if (audioPlayer.src) {
+                        if (audioPlayer.paused) {
+                            audioPlayer.play();
+                            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                            document.getElementById('audio-wave').classList.remove('hidden');
+                        } else {
+                            audioPlayer.pause();
+                            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                            document.getElementById('audio-wave').classList.add('hidden');
+                        }
+                    }
+                });
+                
+                audioPlayer.addEventListener('ended', function() {
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    document.getElementById('audio-wave').classList.add('hidden');
+                });
+            }
+            
+            // Download button
+            const downloadBtn = document.getElementById('download-btn');
+            if (downloadBtn && audioPlayer) {
+                downloadBtn.addEventListener('click', function() {
+                    if (audioPlayer.src) {
+                        const link = document.createElement('a');
+                        link.href = audioPlayer.src;
+                        link.download = `kokoro-tts-${new Date().getTime()}.${getSelectedFormat()}`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                });
+            }
+            
+            // API URL change
+            const saveSettingsBtn = document.getElementById('save-settings');
+            if (saveSettingsBtn) {
+                saveSettingsBtn.addEventListener('click', function() {
+                    const newUrl = document.getElementById('settings-api-url').value;
+                    API_BASE_URL = newUrl;
+                    document.getElementById('api-base-url').value = newUrl;
+                    
+                    // Reload voices and recheck status
+                    loadVoices();
+                    checkApiStatus();
+                    
+                    alert('API URL updated successfully!');
+                });
+            }
+            
+            // Cancel settings button
+            document.getElementById('cancel-settings').addEventListener('click', function() {
+                document.getElementById('settings-api-url').value = API_BASE_URL;
+            });
+            
+            // Toggle API key visibility
+            document.getElementById('toggle-key').addEventListener('click', function() {
+                const apiKeyInput = document.getElementById('api-key');
+                if (apiKeyInput.type === 'password') {
+                    apiKeyInput.type = 'text';
+                    this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                } else {
+                    apiKeyInput.type = 'password';
+                    this.innerHTML = '<i class="fas fa-eye"></i>';
+                }
+            });
+            
+            // Danger zone buttons
+            document.getElementById('clear-cache').addEventListener('click', function() {
+                if (confirm('Are you sure you want to clear the API cache?')) {
+                    alert('API cache cleared successfully!');
+                }
+            });
+            
+            document.getElementById('delete-files').addEventListener('click', function() {
+                if (confirm('Are you sure you want to delete all generated files? This action cannot be undone.')) {
+                    localStorage.removeItem('recentFiles');
+                    document.getElementById('recent-files').innerHTML = '';
+                    recentFiles = [];
+                    alert('All generated files have been deleted!');
+                }
+            });
+            
+            document.getElementById('stop-api').addEventListener('click', function() {
+                if (confirm('Are you sure you want to stop the API service? This will terminate all active processes.')) {
+                    alert('API service stopped successfully!');
+                }
+            });
+            
+            // Voice gallery search
+            document.getElementById('search-btn').addEventListener('click', filterVoices);
+            document.getElementById('voice-search').addEventListener('input', filterVoices);
+            
+            // Voice filters
+            document.querySelectorAll('#voice-filters button').forEach(button => {
+                button.addEventListener('click', function() {
+                    document.querySelectorAll('#voice-filters button').forEach(btn => {
+                        btn.classList.remove('bg-kokoro-100', 'text-kokoro-800');
+                        btn.classList.add('bg-gray-100', 'text-gray-800');
+                    });
+                    this.classList.remove('bg-gray-100', 'text-gray-800');
+                    this.classList.add('bg-kokoro-100', 'text-kokoro-800');
+                    filterVoices();
+                });
+            });
+            
+            // Custom voice training
+            document.getElementById('train-voice-btn').addEventListener('click', trainCustomVoice);
+            
+            // Voice samples upload
+            document.getElementById('voice-samples').addEventListener('change', handleVoiceSamples);
+            
+            // Batch processing listeners
+            setupBatchProcessing();
+        }
+        
+        function initUiComponents() {
+            // Set progress ring to 24%
+            const circle = document.getElementById('usage-ring');
+            const radius = circle.r.baseVal.value;
+            const circumference = 2 * Math.PI * radius;
+            circle.style.strokeDasharray = `${circumference}`;
+            circle.style.strokeDashoffset = circumference * 0.76; // 24% used
+        }
+        
+        function updateApiUrl() {
+            const newUrl = document.getElementById('api-base-url').value;
+            API_BASE_URL = newUrl;
+            document.getElementById('settings-api-url').value = newUrl;
+            checkApiStatus();
+            loadVoices();
+            alert('API URL updated successfully!');
+        }
+        
+        // API status check
+        async function checkApiStatus() {
+            const statusElement = document.getElementById('api-status');
+            const lastChecked = document.getElementById('last-checked');
+            const responseTime = document.getElementById('response-time');
+            
+            // Update status to checking
+            statusElement.innerHTML = `<div class="w-3 h-3 bg-yellow-500 rounded-full mr-2 pulse"></div>
+                                      <span class="text-yellow-700 font-medium">Checking...</span>`;
+            
+            lastChecked.textContent = 'now';
+            
+            try {
+                const start = Date.now();
+                const response = await fetch(`${API_BASE_URL}/status`);
+                const end = Date.now();
+                const duration = end - start;
+                
+                if (response.ok) {
+                    statusElement.innerHTML = `<div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                                              <span class="text-green-700 font-medium">Operational</span>`;
+                    responseTime.textContent = `${duration}ms`;
+                } else {
+                    statusElement.innerHTML = `<div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                                              <span class="text-red-700 font-medium">Unavailable</span>`;
+                    responseTime.textContent = `${duration}ms (error)`;
+                }
+            } catch (error) {
+                statusElement.innerHTML = `<div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                                          <span class="text-red-700 font-medium">Connection Failed</span>`;
+                responseTime.textContent = 'timeout';
+            }
+            
+            // Update time display
+            const now = new Date();
+            lastChecked.textContent = `${now.toLocaleTimeString()}`;
+        }
+        
+        // Voice loading
+        async function loadVoices() {
+            const voiceSelect = document.getElementById('voice-select');
+            const defaultVoiceSelect = document.getElementById('default-voice');
+            const voicesContainer = document.getElementById('voices-container');
+            
+            // Show loading state
+            voiceSelect.innerHTML = '<option value="">Loading voices...</option>';
+            defaultVoiceSelect.innerHTML = '<option value="">Loading voices...</option>';
+            voicesContainer.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-kokoro-600"></i><p class="mt-4 text-gray-600">Loading voices...</p></div>';
+            
+            try {
+                // Simulated API response
+                // In a real app, this would be: const response = await fetch(`${API_BASE_URL}/voices`);
+                // For demo purposes, we'll simulate the response
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                voices = [
+                    { id: 'voice1', name: 'Emma', gender: 'female', accent: 'american', language: 'English', description: 'Clear and professional voice', popularity: 8, sample: 'https://example.com/samples/voice1.wav' },
+                    { id: 'voice2', name: 'David', gender: 'male', accent: 'british', language: 'English', description: 'Warm and friendly voice', popularity: 7, sample: 'https://example.com/samples/voice2.wav' },
+                    { id: 'voice3', name: 'Sophie', gender: 'female', accent: 'australian', language: 'English', description: 'Energetic and expressive voice', popularity: 9, sample: 'https://example.com/samples/voice3.wav' },
+                    { id: 'voice4', name: 'James', gender: 'male', accent: 'american', language: 'English', description: 'Deep and authoritative voice', popularity: 6, sample: 'https://example.com/samples/voice4.wav' },
+                    { id: 'voice5', name: 'Olivia', gender: 'female', accent: 'british', language: 'English', description: 'Soft and calming voice', popularity: 8, sample: 'https://example.com/samples/voice5.wav' },
+                    { id: 'voice6', name: 'Michael', gender: 'male', accent: 'american', language: 'English', description: 'Professional narration voice', popularity: 7, sample: 'https://example.com/samples/voice6.wav' }
+                ];
+                
+                // Populate voice dropdown
+                voiceSelect.innerHTML = '';
+                defaultVoiceSelect.innerHTML = '';
+                voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.id;
+                    option.textContent = `${voice.name} (${voice.gender}, ${voice.accent})`;
+                    voiceSelect.appendChild(option);
+                    
+                    const option2 = document.createElement('option');
+                    option2.value = voice.id;
+                    option2.textContent = `${voice.name} (${voice.gender}, ${voice.accent})`;
+                    defaultVoiceSelect.appendChild(option2);
+                });
+                
+                // Set default selection
+                voiceSelect.value = 'voice1';
+                defaultVoiceSelect.value = 'voice1';
+                
+                // Populate voice gallery
+                renderVoiceGallery();
+                
+            } catch (error) {
+                voiceSelect.innerHTML = '<option value="">Failed to load voices</option>';
+                defaultVoiceSelect.innerHTML = '<option value="">Failed to load voices</option>';
+                voicesContainer.innerHTML = '<div class="text-center py-12"><i class="fas fa-exclamation-triangle text-4xl text-red-500"></i><p class="mt-4 text-red-600">Failed to load voices. Check API connection.</p></div>';
+            }
+        }
+        
+        // Render voice gallery
+        function renderVoiceGallery() {
+            const container = document.getElementById('voices-container');
+            container.innerHTML = '';
+            
+            voices.forEach(voice => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 rounded-lg border border-gray-200 overflow-hidden';
+                card.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex items-center mb-3">
+                            <div class="w-12 h-12 rounded-full bg-kokoro-500 flex items-center justify-center text-white mr-3">
+                                <i class="fas fa-${voice.gender === 'male' ? 'male' : 'female'}"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-gray-800">${voice.name}</h3>
+                                <p class="text-sm text-gray-600">${voice.accent}, ${voice.language}</p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-700 mb-3">${voice.description}</p>
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm">
+                                <span class="text-gray-600">Usage:</span>
+                                <span class="font-medium ${voice.popularity > 7 ? 'text-green-600' : voice.popularity > 4 ? 'text-kokoro-700' : 'text-gray-500'}">${['Low', 'Medium', 'High'][Math.floor(voice.popularity/3.34)]}</span>
+                            </div>
+                            <button onclick="previewVoice('${voice.id}')" class="text-kokoro-600 hover:text-kokoro-800">
+                                <i class="fas fa-play-circle"></i> Preview
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 px-4 py-2 flex justify-end">
+                        <button onclick="selectVoice('${voice.id}')" class="text-sm bg-kokoro-600 hover:bg-kokoro-700 text-white px-3 py-1 rounded">
+                            Select Voice
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        // Filter voices based on search and filter
+        function filterVoices() {
+            const searchTerm = document.getElementById('voice-search').value.toLowerCase();
+            const activeFilter = document.querySelector('#voice-filters button.bg-kokoro-100').dataset.filter;
+            
+            const filteredVoices = voices.filter(voice => {
+                // Search term matching
+                const matchesSearch = voice.name.toLowerCase().includes(searchTerm) || 
+                                     voice.description.toLowerCase().includes(searchTerm) ||
+                                     voice.accent.toLowerCase().includes(searchTerm);
+                
+                // Filter matching
+                let matchesFilter = true;
+                if (activeFilter !== 'all') {
+                    if (activeFilter === 'male' || activeFilter === 'female') {
+                        matchesFilter = voice.gender === activeFilter;
+                    } else if (activeFilter === 'emotional') {
+                        matchesFilter = voice.description.toLowerCase().includes('expressive') || 
+                                       voice.description.toLowerCase().includes('energetic');
+                    } else {
+                        matchesFilter = voice.accent === activeFilter;
+                    }
+                }
+                
+                return matchesSearch && matchesFilter;
+            });
+            
+            // Re-render gallery with filtered voices
+            const container = document.getElementById('voices-container');
+            container.innerHTML = '';
+            
+            if (filteredVoices.length === 0) {
+                container.innerHTML = '<div class="text-center py-12"><i class="fas fa-search text-4xl text-gray-400"></i><p class="mt-4 text-gray-600">No voices match your search</p></div>';
+                return;
+            }
+            
+            filteredVoices.forEach(voice => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 rounded-lg border border-gray-200 overflow-hidden';
+                card.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex items-center mb-3">
+                            <div class="w-12 h-12 rounded-full bg-kokoro-500 flex items-center justify-center text-white mr-3">
+                                <i class="fas fa-${voice.gender === 'male' ? 'male' : 'female'}"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-gray-800">${voice.name}</h3>
+                                <p class="text-sm text-gray-600">${voice.accent}, ${voice.language}</p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-700 mb-3">${voice.description}</p>
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm">
+                                <span class="text-gray-600">Usage:</span>
+                                <span class="font-medium ${voice.popularity > 7 ? 'text-green-600' : voice.popularity > 4 ? 'text-kokoro-700' : 'text-gray-500'}">${['Low', 'Medium', 'High'][Math.floor(voice.popularity/3.34)]}</span>
+                            </div>
+                            <button onclick="previewVoice('${voice.id}')" class="text-kokoro-600 hover:text-kokoro-800">
+                                <i class="fas fa-play-circle"></i> Preview
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 px-4 py-2 flex justify-end">
+                        <button onclick="selectVoice('${voice.id}')" class="text-sm bg-kokoro-600 hover:bg-kokoro-700 text-white px-3 py-1 rounded">
+                            Select Voice
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        // Preview voice sample
+        function previewVoice(voiceId) {
+            const voice = voices.find(v => v.id === voiceId);
+            if (voice) {
+                // In a real app, this would play the voice sample
+                // For demo, we'll simulate playing
+                const audioPlayer = document.getElementById('audio-player');
+                audioPlayer.src = voice.sample;
+                audioPlayer.load();
+                audioPlayer.play();
+                
+                // Update play button
+                document.getElementById('play-btn').innerHTML = '<i class="fas fa-pause"></i>';
+                document.getElementById('preview-text').textContent = `Previewing: ${voice.name}`;
+                document.getElementById('audio-wave').classList.remove('hidden');
+            }
+        }
+        
+        // Select voice in TTS tab
+        function selectVoice(voiceId) {
+            document.getElementById('voice-select').value = voiceId;
+            showTab('tts');
+            document.getElementById('tts-text').focus();
+        }
+        
+        // Get selected format
+        function getSelectedFormat() {
+            return document.querySelector('input[name="format"]:checked').value;
+        }
+        
+        // Get selected emotion
+        function getSelectedEmotion() {
+            return document.getElementById('emotion-select').value;
+        }
+        
+        // Generate TTS
+        async function generateTTS() {
+            const text = document.getElementById('tts-text').value;
+            const voiceId = document.getElementById('voice-select').value;
+            const speed = document.getElementById('speed-slider').value;
+            const format = getSelectedFormat();
+            const emotion = getSelectedEmotion();
+            const generateBtn = document.getElementById('generate-btn');
+            const previewText = document.getElementById('preview-text');
+            
+            if (!text.trim()) {
+                alert('Please enter some text to convert');
+                return;
+            }
+            
+            if (!voiceId) {
+                alert('Please select a voice');
+                return;
+            }
+            
+            // Disable button and show loading
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+            previewText.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing text...';
+            
+            try {
+                // Simulated API request
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Simulate success response
+                const audioUrl = `https://example.com/tts/${voiceId}/${Date.now()}.${format}`;
+                
+                // Update UI
+                document.getElementById('audio-player').src = audioUrl;
+                document.getElementById('download-section').style.display = 'block';
+                previewText.textContent = 'Click play to listen';
+                generateBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Success! Generate Again';
+                
+                // Add to recent files
+                addRecentFile(`tts-${Date.now()}.${format}`, new Date(), voiceId, text);
+                
+            } catch (error) {
+                previewText.textContent = 'Error generating speech. Please try again.';
+                generateBtn.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Error - Try Again';
+            } finally {
+                generateBtn.disabled = false;
+            }
+        }
+        
+        // Add to recent files
+        function addRecentFile(name, date, voice, text) {
+            const recentFilesContainer = document.getElementById('recent-files');
+            
+            const fileItem = document.createElement('div');
+            fileItem.className = 'flex justify-between items-center bg-white border border-gray-200 rounded p-2';
+            fileItem.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-file-audio text-kokoro-600 mr-2"></i>
+                    <div>
+                        <span>${name}</span>
+                        <div class="text-xs text-gray-500">
+                            ${date.toLocaleDateString()} ${date.toLocaleTimeString()} | 
+                            ${voice} | 
+                            <span class="truncate max-w-xs">${text.substring(0, 25)}${text.length > 25 ? '...' : ''}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button class="text-kokoro-600 hover:text-kokoro-800" title="Play" onclick="playRecentFile('${name}')">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="text-green-600 hover:text-green-800" title="Download" onclick="downloadRecentFile('${name}')">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="text-gray-500 hover:text-gray-700" title="Delete" onclick="deleteRecentFile(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            
+            // Add as first item
+            if (recentFilesContainer.firstChild) {
+                recentFilesContainer.insertBefore(fileItem, recentFilesContainer.firstChild);
+            } else {
+                recentFilesContainer.appendChild(fileItem);
+            }
+            
+            // Store in array for potential export
+            recentFiles.unshift({name, date, voice, text});
+            
+            // Save to localStorage
+            localStorage.setItem('recentFiles', JSON.stringify(recentFiles));
+        }
+        
+        // Load recent files from localStorage
+        function loadRecentFiles() {
+            const storedFiles = localStorage.getItem('recentFiles');
+            if (storedFiles) {
+                recentFiles = JSON.parse(storedFiles);
+                const recentFilesContainer = document.getElementById('recent-files');
+                recentFilesContainer.innerHTML = '';
+                
+                recentFiles.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'flex justify-between items-center bg-white border border-gray-200 rounded p-2';
+                    fileItem.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-file-audio text-kokoro-600 mr-2"></i>
+                            <div>
+                                <span>${file.name}</span>
+                                <div class="text-xs text-gray-500">
+                                    ${new Date(file.date).toLocaleDateString()} ${new Date(file.date).toLocaleTimeString()} | 
+                                    ${file.voice} | 
+                                    <span class="truncate max-w-xs">${file.text.substring(0, 25)}${file.text.length > 25 ? '...' : ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-kokoro-600 hover:text-kokoro-800" title="Play" onclick="playRecentFile('${file.name}')">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button class="text-green-600 hover:text-green-800" title="Download" onclick="downloadRecentFile('${file.name}')">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="text-gray-500 hover:text-gray-700" title="Delete" onclick="deleteRecentFile(this)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    recentFilesContainer.appendChild(fileItem);
+                });
+            }
+        }
+        
+        // Play recent file
+        function playRecentFile(name) {
+            const file = recentFiles.find(f => f.name === name);
+            if (file) {
+                const audioPlayer = document.getElementById('audio-player');
+                audioPlayer.src = `https://example.com/recent/${name}`;
+                audioPlayer.load();
+                audioPlayer.play();
+                
+                // Update play button
+                document.getElementById('play-btn').innerHTML = '<i class="fas fa-pause"></i>';
+                document.getElementById('preview-text').textContent = `Playing: ${name}`;
+                document.getElementById('audio-wave').classList.remove('hidden');
+            }
+        }
+        
+        // Download recent file
+        function downloadRecentFile(name) {
+            const link = document.createElement('a');
+            link.href = `https://example.com/recent/${name}`;
+            link.download = name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Delete recent file
+        function deleteRecentFile(button) {
+            const fileItem = button.closest('.flex');
+            const fileName = fileItem.querySelector('span').textContent;
+            
+            if (confirm(`Are you sure you want to delete ${fileName}?`)) {
+                // Remove from UI
+                fileItem.remove();
+                
+                // Remove from array
+                const index = recentFiles.findIndex(f => f.name === fileName);
+                if (index !== -1) {
+                    recentFiles.splice(index, 1);
+                }
+                
+                // Update localStorage
+                localStorage.setItem('recentFiles', JSON.stringify(recentFiles));
+            }
+        }
+        
+        // Handle voice samples upload
+        function handleVoiceSamples(e) {
+            const files = e.target.files;
+            const samplesList = document.getElementById('samples-list');
+            const samplesNames = document.getElementById('samples-names');
+            
+            if (files.length === 0) {
+                samplesList.classList.add('hidden');
+                return;
+            }
+            
+            samplesList.classList.remove('hidden');
+            samplesNames.innerHTML = '';
+            
+            for (let i = 0; i < files.length; i++) {
+                const li = document.createElement('li');
+                li.textContent = files[i].name;
+                samplesNames.appendChild(li);
+            }
+            
+            document.getElementById('audio-icon').className = 'fas fa-check-circle text-2xl text-green-500 mb-2';
+            document.getElementById('samples-text').innerHTML = '<span class="font-semibold text-green-600">Files selected</span>';
+        }
+        
+        // Train custom voice
+        function trainCustomVoice() {
+            const voiceName = document.getElementById('custom-voice-name').value;
+            const gender = document.querySelector('input[name="gender"]:checked').value;
+            const accent = document.getElementById('custom-accent').value;
+            const pitch = document.getElementById('custom-pitch').value;
+            
+            if (!voiceName) {
+                alert('Please enter a voice name');
+                return;
+            }
+            
+            const files = document.getElementById('voice-samples').files;
+            if (files.length === 0) {
+                alert('Please upload at least one voice sample');
+                return;
+            }
+            
+            const trainBtn = document.getElementById('train-voice-btn');
+            trainBtn.disabled = true;
+            trainBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Training...';
+            
+            // Simulate training process
+            setTimeout(() => {
+                trainBtn.disabled = false;
+                trainBtn.innerHTML = 'Train Custom Voice';
+                alert(`Custom voice "${voiceName}" trained successfully!`);
+                
+                // Add to voices list
+                const newVoice = {
+                    id: `custom_${Date.now()}`,
+                    name: voiceName,
+                    gender: gender,
+                    accent: accent,
+                    language: 'English',
+                    description: `Custom voice with ${accent} accent`,
+                    popularity: 5,
+                    sample: 'https://example.com/samples/custom.wav'
+                };
+                
+                voices.push(newVoice);
+                
+                // Update dropdowns and gallery
+                const voiceSelect = document.getElementById('voice-select');
+                const option = document.createElement('option');
+                option.value = newVoice.id;
+                option.textContent = `${newVoice.name} (${newVoice.gender}, ${newVoice.accent})`;
+                voiceSelect.appendChild(option);
+                
+                renderVoiceGallery();
+                
+                // Reset form
+                document.getElementById('custom-voice-name').value = '';
+                document.getElementById('voice-samples').value = '';
+                document.getElementById('samples-list').classList.add('hidden');
+                document.getElementById('audio-icon').className = 'fas fa-file-audio text-2xl text-gray-400 mb-2';
+                document.getElementById('samples-text').innerHTML = '<span class="font-semibold">Click to upload</span> audio files';
+            }, 3000);
+        }
+        
+        // Batch processing functions
+        function setupBatchProcessing() {
+            const fileInput = document.getElementById('batch-file');
+            const dropZone = document.getElementById('drop-zone');
+            const processBtn = document.getElementById('process-btn');
+            
+            // File input handling
+            fileInput.addEventListener('change', function(e) {
+                if (this.files && this.files[0]) {
+                    handleFileUpload(this.files[0]);
+                }
+            });
+            
+            // Drag and drop handling
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('border-kokoro-500', 'bg-kokoro-50');
+            });
+            
+            dropZone.addEventListener('dragleave', function(e) {
+                this.classList.remove('border-kokoro-500', 'bg-kokoro-50');
+            });
+            
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('border-kokoro-500', 'bg-kokoro-50');
+                
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+            
+            // Process button
+            if (processBtn) {
+                processBtn.addEventListener('click', processBatch);
+            }
+            
+            // Batch action buttons
+            document.getElementById('pause-btn').addEventListener('click', toggleBatchPause);
+            document.getElementById('cancel-btn').addEventListener('click', cancelBatch);
+            document.getElementById('download-batch-btn').addEventListener('click', downloadBatch);
+        }
+        
+        function handleFileUpload(file) {
+            if (file && file.name.endsWith('.csv')) {
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('file-details').classList.remove('hidden');
+                document.getElementById('csv-icon').className = 'fas fa-file-csv text-4xl text-green-500 mb-3';
+                document.getElementById('drop-text').innerHTML = '<span class="font-semibold text-green-600">File selected</span>';
+                
+                // Read CSV file
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const csvData = e.target.result;
+                    parseCSV(csvData);
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please select a valid CSV file');
+            }
+        }
+        
+        function parseCSV(csvData) {
+            const lines =
+</html>
